@@ -2,9 +2,15 @@ import argparse
 import json
 import pandas as pd
 import sys
+from fractions import Fraction
 from pprint import pprint
 
 DIFFICULTIES = ["Easy", "Medium", "Hard", "Deadly"]
+ENVIRONMENTS = ["Arctic", "Coastal", "Desert", "Forest", "Grassland", 
+                "Hill", "Mountain", "Swamp", "Underdark", "Underwater", 
+                "Urban", "Other Plane"]
+
+LOW_LEVEL_CUTOFF = 4
 
 def arg_parse() -> argparse.Namespace:
 
@@ -73,19 +79,52 @@ def character_xp_calc(args):
         print(f"{diff: <15}:{tot: >40}")
         
     args.max_xp = totals[DIFFICULTIES.index(args.difficulty)]
+    args.average_level = int(sum(args.characters)//len(args.characters))
 
     print_break()
 
     return args
 
 
+def get_monster_options(monster_man_df, args):
+
+    current_mm_df = monster_man_df.copy()
+
+    if min(args.characters) < LOW_LEVEL_CUTOFF:
+        current_mm_df = monster_man_df[monster_man_df["CR_Clean"]<int(args.average_level)]
+
+    current_mm_df = current_mm_df[current_mm_df['CR_Clean']>0]
+
+    if args.strict:
+        if args.environments:
+            current_mm_df = current_mm_df[(current_mm_df[args.environments]==1).any(axis=1)]
+
+        if args.monsters:
+            current_mm_df = current_mm_df[current_mm_df['Name'].isin(args.monsters)]
+
+    print(current_mm_df)
+
+
+def string_to_float(x):
+    if "/" in x:
+        return int(x.split("/")[0])/int(x.split("/")[1])
+    return x
+
+
 def main():
     args = arg_parse()
-    show_settings(args)
 
     args = character_xp_calc(args)
+    show_settings(args)
     
     monster_man_df = pd.read_csv("Data/monster_manual.csv")
+    cr_to_xp_df = pd.read_csv("Data/CR_to_XP.csv")
+
+    monster_man_df['CR_Clean'] = monster_man_df['CR'].apply(string_to_float).astype(float)
+    monster_man_df = monster_man_df.merge(cr_to_xp_df, how="left", left_on="CR_Clean", right_on="CR").drop("CR_y",axis=1)
+
+    monster_options = get_monster_options(monster_man_df, args)
+
 
 
 if __name__ == '__main__':
