@@ -1,0 +1,9 @@
+{
+    "strict": true,
+    "monsters": ["Goblin","Goblin Boss"],
+    "characters": [1,1,2,2],
+    "environments": ["Forest", "Hill"],
+    "max-size":5,
+    "min-size":4,
+    "difficulty":"Medium"
+}

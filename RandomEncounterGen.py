@@ -1,8 +1,23 @@
+"""
+This is a program that Generates an encounter based on parameters
+
+Example Config_Template:
+{
+    "strict": true,
+    "monsters": ["Goblin","Goblin Boss"],
+    "characters": [1,1,2,2],
+    "environments": ["Forest", "Hill"],
+    "max-size":5,
+    "min-size":4,
+    "difficulty":"Medium"
+}
+
+"""
+
 import argparse
 import json
 import pandas as pd
 import sys
-from fractions import Fraction
 from pprint import pprint
 
 DIFFICULTIES = ["Easy", "Medium", "Hard", "Deadly"]
@@ -86,12 +101,12 @@ def character_xp_calc(args):
     return args
 
 
-def get_monster_options(monster_man_df, args):
+def get_monster_options(monster_man_df: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame:
 
     current_mm_df = monster_man_df.copy()
 
     if min(args.characters) < LOW_LEVEL_CUTOFF:
-        current_mm_df = monster_man_df[monster_man_df["CR_Clean"]<int(args.average_level)]
+        current_mm_df = monster_man_df[monster_man_df["CR_Clean"]<=int(args.average_level)]
 
     current_mm_df = current_mm_df[current_mm_df['CR_Clean']>0]
 
@@ -102,7 +117,26 @@ def get_monster_options(monster_man_df, args):
         if args.monsters:
             current_mm_df = current_mm_df[current_mm_df['Name'].isin(args.monsters)]
 
-    print(current_mm_df)
+    return current_mm_df
+
+
+def find_combinations(target_xp: int, monster_df: pd.DataFrame, current_combination=[], all_combinations=set()) -> set:
+    # Base case: if target_xp is 0, we found a valid combination
+    if target_xp == 0:
+        # Sort the combination and convert to tuple to add to the set
+        all_combinations.add(tuple(sorted(current_combination)))
+        return all_combinations
+
+    # If target_xp becomes negative, there is no valid combination
+    if target_xp < 0:
+        return all_combinations
+
+    # Iterate over the DataFrame rows
+    for i, monster in monster_df.iterrows():
+        # Recur with the same DataFrame to allow multiple instances of the same monster
+        find_combinations(target_xp - monster['XP'], monster_df, current_combination + [monster['Name']], all_combinations)
+
+    return all_combinations
 
 
 def string_to_float(x):
@@ -123,8 +157,12 @@ def main():
     monster_man_df['CR_Clean'] = monster_man_df['CR'].apply(string_to_float).astype(float)
     monster_man_df = monster_man_df.merge(cr_to_xp_df, how="left", left_on="CR_Clean", right_on="CR").drop("CR_y",axis=1)
 
-    monster_options = get_monster_options(monster_man_df, args)
+    monster_options_df = get_monster_options(monster_man_df, args)
+    print(monster_options_df)
+    print_break()
 
+    pprint(find_combinations(args.max_xp, monster_options_df[["XP","Name"]]))
+    print_break()
 
 
 if __name__ == '__main__':
